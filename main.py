@@ -19,7 +19,7 @@ class Drink(db.Model):
 # GET HomePage
 @app.route('/')
 def hello_world():
-    return 'Hello, World!'
+    return {'Hello': 'Witam'}
 
 # Get * from Drinks
 @app.route('/drinks')
@@ -38,7 +38,7 @@ def get_drink(id):
     return {"name": drink.name, "description": drink.description}
 
 
-@app.route('/drinks', method=['POST'])
+@app.route('/drinks', methods=['POST'])
 def add_drink():
     drink = Drink(name=request.json['name'], description=request.json['description'])
     db.session.add(drink)
@@ -60,7 +60,8 @@ if __name__ == "__main__":
 
 
 # from main import db
+# from main import Drink
 # drink = Drink(name="", description="")
 # db.session.add(drink)
 # db.session.commit()
-# db.session.all()
+# Drink.query.all()
