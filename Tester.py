@@ -12,18 +12,16 @@ from requests.exceptions import Timeout
 import json
 import pandas as pd
 
-i = 0
-l_body_zapytania = []
-l_czas_zapytan = []
-l_zapytan = []
-l_odpowiedzi = []
-lista_rozmiaru_danych = []
-lista_bit = []
-lista_stat = []
-lista_czas = []
-lista_bled = []
-l_json = []
-url_list = ["https://api.github.com/some/endpoint"]*2000
+l_request_body = []
+l_request_time = []
+l_request = []
+l_response = []
+l_response_data = []
+l_status = []
+l_reqeust_time = []
+l_errors = []
+l_json_format = []
+url_list = ["http://127.0.0.1:3000/drinks"]*1000
 
 ### Zmienna thread_local będzie przechowywać obiekty sesji
 thread_local = local()
@@ -41,73 +39,72 @@ body = 'GET', url_list[0] ,' GET data, [no cookies]'
 body = str(body)
 
 def dane(response):
-    l_body_zapytania.append(response.request.body)
-    lista_rozmiaru_danych.append(response.headers['Content-Length'])
-    lista_czas.append(round(float(response.elapsed.microseconds)*pow(10,-3),2))
-    lista_stat.append(response.status_code)
-    lista_bit.append(float(response.headers['Content-Length']))
-    l_json.append(response.json())
-    l_odpowiedzi.append(response.headers)
-    l_zapytan.append(response.request.headers)
-    l_czas_zapytan.append(float(response.request.headers['Content-Length']))
+    l_request_body.append(response.request.body)
+    l_reqeust_time.append(round(float(response.elapsed.microseconds)*pow(10,-3),2))
+    l_status.append(response.status_code)
+    l_response_data.append(float(response.headers['Content-Length']))
+    l_json_format.append(response.json())
+    l_response.append(response.headers)
+    l_request.append(response.request.headers)
+    l_request_time.append(float(response.request.headers['Content-Length']))
 
 ###
 # Funkcja get_session pozwala na utworzenie jednego obiektu Session 
 # z pakietu threading dzięki czemu n-wątków będzie dzielić
 # jeden obiekt Session zamiast tworzyć dla każdego wątku pojedynczy obiekt
 ###
-def get_session() -> Session:
+def get_session():
     if not hasattr(thread_local,'session'):
         thread_local.session = requests.Session()
     return thread_local.session
 
-def download_link(url:str):
+def get_method(url):
         session = get_session()
         try:
-            with session.get(url,timeout=(3,0.2), headers=headers, data=body) as response:
+            with session.get(url,timeout=(3,0.5), headers=headers, data=body) as response:
                 dane(response)
         except requests.exceptions.ReadTimeout as e:        
-            lista_bled.append(e)
+            l_errors.append(e)
         except requests.exceptions.ConnectionError as cr:
-            lista_bled.append(cr)
+            l_errors.append(cr)
             
 ###
 # urls:list - ta czesc kodu mowi ze argumentem przekazywanym do funkcji
 # powinna byc lista.
 # ThreadPoolExecutor(max_workers=60) - tworzymy wątki 
-# funkcja executor.map - przyjmuje jako argumnety funkcje download_link
+# funkcja executor.map - przyjmuje jako argumnety funkcje get_method
 # oraz całą liste linków url jak iteratory
 ###
-def download_all(urls:list):
+def download_all(urls):
     with ThreadPoolExecutor(max_workers=350) as executor:
-        executor.map(download_link,url_list)
+        executor.map(get_method,url_list)
 
 
 start = time.time()
 download_all(url_list)
 end = time.time()
-print(i)
 print("\n")
 print(f'Wyslano {len(url_list)} zapytan w {round(end - start,2)} sekund')
-print("Sredni czas wysylania pakietu: ",round(sum(lista_czas)/len(lista_czas),2)," ms")
-print("Maksymalny czas wysylania pakietu: ",max(lista_czas)," ms")
-print("Minmalny czas wysylania pakietu: ",min(lista_czas)," ms")
-print("Ilosc pakietow dostarczonych i otrzymanych",len(lista_stat))
-print("Ilosc bledow: ", len(lista_bled))
-print("Ilosc pakietow wyslanych na sekunde: ", round((len(lista_stat)+len(lista_bled))/round(end - start,2),2))
-print("Ilosc KB/s: ", round((sum(lista_bit)/1024)/round(end - start,2),2))
-print("Wyslano KB/s: ", round((sum(l_czas_zapytan)/1024)/round(end - start,2),2),"\n")
-print("Przykład formatu JSON: \n", l_json[0],"\n")
-print("Przykladowy opis zwroconego zapytania: \n", l_odpowiedzi[0], "\n")
-print("Przykladowy header zapytania wysylanego na serwer: \n", l_zapytan[0], "\n" )
-print("Przykladowe body zapytania wysylanego na serwer: \n", l_body_zapytania[0], "\n" )
-if len(lista_bled) > 0:
+print("Sredni czas wysylania pakietu: ",round(sum(l_reqeust_time)/len(l_reqeust_time),2)," ms")
+print("Maksymalny czas wysylania pakietu: ",max(l_reqeust_time)," ms")
+print("Minmalny czas wysylania pakietu: ",min(l_reqeust_time)," ms")
+print("Ilosc pakietow dostarczonych i otrzymanych",len(l_status))
+print("Ilosc bledow: ", len(l_errors))
+print("Ilosc pakietow wyslanych na sekunde: ", round((len(l_status)+len(l_errors))/round(end - start,2),2))
+print("Ilosc KB/s: ", round((sum(l_response_data)/1024)/round(end - start,2),2))
+print("Wyslano KB/s: ", round((sum(l_request_time)/1024)/round(end - start,2),2),"\n")
+print("Przykład formatu JSON: \n", l_json_format[0],"\n")
+print("Przykladowy opis zwroconego zapytania: \n", l_response[0], "\n")
+print("Przykladowy header zapytania wysylanego na serwer: \n", l_request[0], "\n" )
+print("Przykladowe body zapytania wysylanego na serwer: \n", l_request_body[0], "\n" )
+if len(l_errors) > 0:
     df_errors = pd.DataFrame(columns=["Opis_bledu"])
-    df_errors["Opis_bledu"] = lista_bled
+    df_errors["Opis_bledu"] = l_errors
+    print("Przykldowy opis bledu: \n",df_errors["Opis_bledu"][1],"\n" )
     print(df_errors)
-    #df_errors.to_csv(r'C:\Users\gosc\Documents\PSISK_Projekt\REST_API\lista_bledow.csv')
-    #print("Przykladowy opis bledu: \n", lista_bled[0],"\n")
+    df_errors.to_csv(r'C:\Users\gosc\Documents\PSISK_Projekt\REST_API\l_errorsow.csv')
     
 
-### kb = bytes / 1024
+
+
 
